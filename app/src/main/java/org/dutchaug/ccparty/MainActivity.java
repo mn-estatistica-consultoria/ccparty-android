@@ -113,9 +113,9 @@ public class MainActivity extends ActionBarActivity implements ConnectionCallbac
 
     private void startCasting(CastDevice device) {
         Intent intent = new Intent(this, CastService.class);
+        intent.setAction(CastService.ACTION_START_CAST);
         intent.putExtra(CastService.EXTRA_DEVICE, device);
         startService(intent);
-        bindService(intent, mServiceConnection, 0);
     }
 
     private void stopCasting() {
@@ -142,11 +142,6 @@ public class MainActivity extends ActionBarActivity implements ConnectionCallbac
                 mDeviceDiscovered = true;
                 showSignIn();
             }
-        }
-
-        Intent intent = new Intent(this, CastService.class);
-        if (bindService(intent, mServiceConnection, 0)) {
-            Log.i(TAG, "Bound to service");
         }
     }
 
@@ -178,6 +173,12 @@ public class MainActivity extends ActionBarActivity implements ConnectionCallbac
     @Override
     protected void onStart() {
         super.onStart();
+
+        Intent intent = new Intent(this, CastService.class);
+        if (bindService(intent, mServiceConnection, 0)) {
+            Log.i(TAG, "Bound to service");
+        }
+
         if (mDeviceDiscovered) {
             mGoogleApiClient.connect();
         }
@@ -187,15 +188,10 @@ public class MainActivity extends ActionBarActivity implements ConnectionCallbac
     protected void onStop() {
         super.onStop();
         mGoogleApiClient.disconnect();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
         try {
             unbindService(mServiceConnection);
-        } catch (Exception ex) {
-            // ignore;
+        } catch (IllegalStateException ex) {
+            // ignore
         }
     }
 

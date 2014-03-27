@@ -44,15 +44,11 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
 
     public static final String EXTRA_DEVICE = "device";
     public static final String EXTRA_SESSION_ID = "session";
+    public static final String ACTION_START_CAST = "org.dutchaug.ccparty.ACTION_START_CAST";
     private static final String TAG = "CastService";
-
     private GoogleApiClient mGoogleApiClient;
     private boolean mUnbound;
     private String mSessionId;
-    private MediaRouter mMediaRouter;
-    private ExecutorService mThreadPool = Executors.newFixedThreadPool(1);
-    private MessageReceivedCallback mMessagesCallback;
-
     private Listener mListener = new Listener() {
         @Override
         public void onApplicationDisconnected(int statusCode) {
@@ -63,7 +59,9 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
             stopSelf();
         }
     };
-
+    private MediaRouter mMediaRouter;
+    private ExecutorService mThreadPool = Executors.newFixedThreadPool(1);
+    private MessageReceivedCallback mMessagesCallback;
     private ContentObserver mObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
         @Override
         public void onChange(boolean selfChange) {
@@ -139,10 +137,12 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
             Log.d(TAG, "onStartCommand");
         }
 
-        CastDevice device = intent.getParcelableExtra(EXTRA_DEVICE);
+        if (ACTION_START_CAST.equals(intent.getAction())) {
+            CastDevice device = intent.getParcelableExtra(EXTRA_DEVICE);
 
-        if (device != null) {
-            startCasting(device);
+            if (device != null) {
+                startCasting(device);
+            }
         }
         return START_NOT_STICKY;
     }
@@ -153,10 +153,16 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
             Log.d(TAG, "onUnbind");
             if (!mGoogleApiClient.isConnected()) {
                 stopSelf();
+            } else {
+                showNotification();
             }
         }
         mUnbound = true;
         return true;
+    }
+
+    private void showNotification() {
+        //TODO setforeground and show a notification that we're casting
     }
 
     @Override
@@ -175,6 +181,12 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
         }
         mUnbound = false;
         return new LocalBinder();
+    }
+
+    private void stopSelfIfUnbound() {
+        if (mUnbound) {
+            stopSelf();
+        }
     }
 
     @Override
@@ -209,7 +221,7 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
                 } else {
                     mSessionId = null;
                     mMediaRouter.selectRoute(mMediaRouter.getDefaultRoute());
-                    stopSelf();
+                    stopSelfIfUnbound();
                 }
             }
         });
@@ -232,7 +244,7 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
     @Override
     public void onConnectionFailed(ConnectionResult result) {
         Log.d(TAG, "Connection failed");
-        stopSelf();
+        stopSelfIfUnbound();
     }
 
     public void stopCasting() {
@@ -245,7 +257,7 @@ public class CastService extends Service implements ConnectionCallbacks, OnConne
             @Override
             public void onResult(Status status) {
                 mGoogleApiClient.disconnect();
-                stopSelf();
+                stopSelfIfUnbound();
             }
         });
     }
